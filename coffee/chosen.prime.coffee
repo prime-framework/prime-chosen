@@ -1,23 +1,25 @@
 ###
 Chosen source: generate output using 'cake build'
-Copyright (c) 2011 by Harvest
+Copyright (c) 2012 by Inversoft
 ###
 root = this
 
 class Chosen extends AbstractChosen
 
+  constructor: (@form_field, @options={}) ->
+    @prime_field = if @form_field instanceof Prime.Dom.Element then @form_field else new Prime.Dom.Element(@form_field)
+    @form_field = @prime_field.domElement
+    super(@form_field, @options)
+
   setup: ->
-    @is_multiple = @form_field.attribute('multiple') != null
-    @current_value = @form_field.getValue()
-    @is_rtl = @form_field.hasClass "chzn-rtl"
+    @current_value = @prime_field.getValue()
+    @is_rtl = @prime_field.hasClass "chzn-rtl"
+    @allow_custom_value = @prime_field.hasClass "chzn-custom-value" || @options.allow_custom_value
 
   finish_setup: ->
-    @form_field.addClass "chzn-done"
+    @prime_field.addClass "chzn-done"
 
   set_default_values: ->
-    #hacky hacky, but the AbstractChosen expects there to be options on the form_field...maybe re-introduce prime_field?
-    @form_field.options = @form_field.domElement.options
-    
     super()
     
     # HTML Templates
@@ -25,11 +27,13 @@ class Chosen extends AbstractChosen
     @multi_temp = new Prime.Dom.Template('<ul class="chzn-choices"><li class="search-field"><input type="text" value="#{default}" class="default" autocomplete="off" style="width:25px;" /></li></ul><div class="chzn-drop" style="left:-9000px;"><ul class="chzn-results"></ul></div>')
     @choice_temp = new Prime.Dom.Template('<li class="search-choice" id="#{id}"><span>#{choice}</span><a href="javascript:void(0)" class="search-choice-close" rel="#{position}"></a></li>')
     @no_results_temp = new Prime.Dom.Template('<li class="no-results">' + @results_none_found + ' "<span>#{terms}</span>"</li>')
+    @group_temp = new Prime.Dom.Template('<li id="#{id}" class="group-result" style="display: list-item">#{label}</li>')
+    @custom_choice_temp = new Prime.Dom.Template('<option value="#{value}">#{value}</option>') if @allow_custom_value;
 
   set_up_html: ->
     @container_id = @form_field.id.replace(/[^\w]/g, '_') + "_chzn"
     
-    @f_width = if @form_field.getStyle("width") then parseInt @form_field.getStyle("width"), 10 else @form_field.getComputedStyle()['width']
+    @f_width = if @prime_field.getStyle("width") then parseInt @prime_field.getStyle("width"), 10 else @prime_field.getComputedStyle()['width']
     
     container_props =
       'id': @container_id
@@ -39,8 +43,8 @@ class Chosen extends AbstractChosen
     base_template = Prime.Dom.newElement('<div/>', container_props)
     if @is_multiple then @multi_temp.appendTo(base_template, { "default": @default_text}) else @single_temp.appendTo(base_template, { "default": @default_text})
 
-    base_template.insertAfter(@form_field)
-    @form_field.hide();
+    base_template.insertAfter(@prime_field)
+    @prime_field.hide();
     @container = Prime.Dom.queryByID(@container_id)
     @container.addClass( "chzn-container-" + (if @is_multiple then "multi" else "single") )
     @dropdown = Prime.Dom.queryFirst('div.chzn-drop', @container)
@@ -54,17 +58,12 @@ class Chosen extends AbstractChosen
     @search_results = Prime.Dom.queryFirst('ul.chzn-results', @container)
     this.search_field_scale()
 
-    #@search_no_results = @container.down('li.no-results')
     @search_no_results = Prime.Dom.queryFirst('li.no-results', @container)
     
     if @is_multiple
-      #@search_choices = @container.down('ul.chzn-choices')
-      #@search_container = @container.down('li.search-field')
       @search_choices = Prime.Dom.queryFirst('ul.chzn-choices', @container)
       @search_container = Prime.Dom.queryFirst('li.search-field', @container)
     else
-      #@search_container = @container.down('div.chzn-search')
-      #@selected_item = @container.down('.chzn-single')
       @search_container = Prime.Dom.queryFirst('div.chzn-search', @container)
       @selected_item = Prime.Dom.queryFirst('.chzn-single', @container)
       sf_width = dd_width - get_side_border_padding(@search_container) - get_side_border_padding(@search_field)
@@ -72,7 +71,7 @@ class Chosen extends AbstractChosen
     
     this.results_build()
     this.set_tab_index()
-    @form_field.fireEvent("liszt:ready", {chosen: this})
+    @prime_field.fireEvent("liszt:ready", {chosen: this})
 
   register_observers: ->
     @container.withEventListener "mousedown", (evt) => this.container_mousedown(evt)
@@ -84,7 +83,7 @@ class Chosen extends AbstractChosen
     @search_results.withEventListener "mouseover", (evt) => this.search_results_mouseover(evt)
     @search_results.withEventListener "mouseout", (evt) => this.search_results_mouseout(evt)
     
-    @form_field.withEventListener "liszt:updated", (evt) => this.results_update_field(evt)
+    @prime_field.withEventListener "liszt:updated", (evt) => this.results_update_field(evt)
 
     @search_field.withEventListener "blur", (evt) => this.input_blur(evt)
     @search_field.withEventListener "keyup", (evt) => this.keyup_checker(evt)
@@ -101,15 +100,17 @@ class Chosen extends AbstractChosen
       evt.target = new Prime.Dom.Element(evt.target)
 
   search_field_disabled: ->
-    @is_disabled = @form_field.attribute 'disabled'
+    @is_disabled = @prime_field.getAttribute 'disabled'
     if(@is_disabled)
       @container.addClass 'chzn-disabled'
-      @search_field.setAttribute('disabled', true)
+      #setAttribute didn't work for this
+      @search_field.domElement.disabled = true
       @selected_item.removeEventListener "focus", @activate_proxy if !@is_multiple
       this.close_field()
     else
       @container.removeClass 'chzn-disabled'
-      @search_field.setAttribute('disabled', false)
+      #setAttribute didn't work for this
+      @search_field.domElement.disabled = false
       @activate_proxy = @selected_item.addEventListener "focus", @activate_action if !@is_multiple
 
   container_mousedown: (evt) ->
@@ -138,7 +139,6 @@ class Chosen extends AbstractChosen
     this.close_field() if not @active_field and @container.hasClass("chzn-container-active")
 
   close_field: ->
-    #document.stopObserving "click", @click_test_action
     Prime.Dom.Document.removeEventListener "click", @click_test_proxy
     
     if not @is_multiple
@@ -176,7 +176,7 @@ class Chosen extends AbstractChosen
 
   results_build: ->
     @parsing = true
-    @results_data = root.SelectParser.select_to_array(@form_field.domElement)
+    @results_data = root.SelectParser.select_to_array(@form_field)
 
     if @is_multiple and @choices > 0
       Prime.Dom.queryFirst("li.search-choice", @search_choices).removeFromDOM()
@@ -213,29 +213,29 @@ class Chosen extends AbstractChosen
   result_add_group: (group) ->
     if not group.disabled
       group.dom_id = @container_id + "_g_" + group.array_index
-      '<li id="' + group.dom_id + '" class="group-result">' + group.label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); + '</li>'
+      @group_temp.generate({'id': group.dom_id, 'label': group.label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')})
     else
       ""
   
   result_do_highlight: (el) ->
-      this.result_clear_highlight()
+    this.result_clear_highlight()
 
-      @result_highlight = el
-      @result_highlight.addClass "highlighted"
+    @result_highlight = el
+    @result_highlight.addClass "highlighted"
 
-      styles = @search_results.getComputedStyle()
-      
-      maxHeight = parseInt styles['maxHeight'], 10
-      visible_top = styles['scrollTop']
-      visible_bottom = maxHeight + visible_top
+    styles = @search_results.getComputedStyle()
+    
+    maxHeight = parseInt styles['maxHeight'], 10
+    visible_top = styles['scrollTop']
+    visible_bottom = maxHeight + visible_top
 
-      high_top = @result_highlight.position()['top']
-      high_bottom = high_top + @result_highlight.getComputedStyle()['height']
+    high_top = @result_highlight.position()['top']
+    high_bottom = high_top + @result_highlight.getComputedStyle()['height']
 
-      if high_bottom >= visible_bottom
-        @search_results.domElement.scrollTop = if (high_bottom - maxHeight) > 0 then (high_bottom - maxHeight) else 0
-      else if high_top < visible_top
-        @search_results.domElement.scrollTop = high_top
+    if high_bottom >= visible_bottom
+      @search_results.domElement.scrollTop = if (high_bottom - maxHeight) > 0 then (high_bottom - maxHeight) else 0
+    else if high_top < visible_top
+      @search_results.domElement.scrollTop = high_top
     
   result_clear_highlight: ->
     @result_highlight.removeClass('highlighted') if @result_highlight
@@ -247,31 +247,31 @@ class Chosen extends AbstractChosen
       if @result_single_selected
         this.result_do_highlight( @result_single_selected )
     else if @max_selected_options <= @choices
-      @form_field.fireEvent("liszt:maxselected", {chosen: this})
+      @prime_field.fireEvent("liszt:maxselected", {chosen: this})
       return false
 
     dd_top = if @is_multiple then @container.getComputedStyle()['height'] else (@container.getComputedStyle()['height'] - 1)
-    @form_field.fireEvent("liszt:showing_dropdown", {chosen: this})
+    @prime_field.fireEvent("liszt:showing_dropdown", {chosen: this})
     @dropdown.setStyles {"top":  dd_top + "px", "left":0}
     @results_showing = true
 
-    @search_field.fireEvent("focus")
-    #@search_field.setValue @search_field.getValue
-
-    #this.winnow_results()
+    @search_field.fireEvent "focus"
+    #still not sure what this is serving
+    @search_field.setValue @search_field.getValue()
+    
+    this.winnow_results()
 
   results_hide: ->
     @selected_item.removeClass('chzn-single-with-drop') unless @is_multiple
     this.result_clear_highlight()
-    @form_field.fireEvent("liszt:hiding_dropdown", {chosen: this})
+    @prime_field.fireEvent("liszt:hiding_dropdown", {chosen: this})
     @dropdown.setStyles({"left":"-9000px"})
     @results_showing = false
 
-
   set_tab_index: (el) ->
-    if @form_field.attribute 'tabIndex'
-      ti = @form_field.attribute 'tabIndex'
-      @form_field.setAttribute 'tabIndex', -1
+    if @prime_field.getAttribute 'tabIndex'
+      ti = @prime_field.getAttribute 'tabIndex'
+      @prime_field.setAttribute 'tabIndex', -1
 
       if @is_multiple
         @search_field.setAttribute 'tabIndex', ti
@@ -311,15 +311,10 @@ class Chosen extends AbstractChosen
 
   choice_build: (item) ->
     if @is_multiple and @max_selected_options <= @choices
-      @form_field.fireEvent("liszt:maxselected", {chosen: this})
+      @prime_field.fireEvent("liszt:maxselected", {chosen: this})
       return false
     choice_id = @container_id + "_c_" + item.array_index
     @choices += 1
-    # @search_container.insert
-    #   before: @choice_temp.evaluate
-    #     id:       choice_id
-    #     choice:   item.html
-    #     position: item.array_index
     @choice_temp.insertBefore(@search_container, {id: choice_id, choice: item.html, position: item.array_index})
     link = Prime.Dom.queryFirst('li.#' + choice_id + ' a', @search_choices)
     link.addEventListener "click", (evt) => this.choice_destroy_link_click(evt)
@@ -341,15 +336,12 @@ class Chosen extends AbstractChosen
     Prime.Dom.ancestor('li', link).removeFromDOM()
 
   results_reset: ->
-    #@form_field.options[0].selected = true
-    Prime.Dom.query("option", @form_field)[0].setAttribute("selected", true);
-    #@selected_item.down("span").update(@default_text)
+    @form_field.options[0].selected = true
     Prime.Dom.queryFirst("span", @selected_item).setHTML(@default_text);
     @selected_item.addClass("chzn-default") if not @is_multiple    
     this.show_search_field_default()
     this.results_reset_cleanup()
-    #@form_field.simulate("change") if typeof Event.simulate is 'function'
-    @form_field.fireEvent("change") if typeof Event.simulate is 'function'
+    @prime_field.fireEvent("change") if typeof Event.simulate is 'function'
     this.results_hide() if @active_field
 
   results_reset_cleanup: ->
@@ -364,7 +356,6 @@ class Chosen extends AbstractChosen
       if @is_multiple
         this.result_deactivate high
       else
-        # @search_results.descendants(".result-selected").invoke "removeClassName", "result-selected"
         Prime.Dom.query(".result-selected", @search_results).each (index) -> this.removeClass("result-selected")
         @selected_item.removeClass("chzn-default")
         @result_single_selected = high
@@ -375,13 +366,11 @@ class Chosen extends AbstractChosen
       item = @results_data[position]
       item.selected = true
 
-      #@form_field.options[item.options_index].selected = true
-      Prime.Dom.query("option", @form_field)[item.options_index].setAttribute("selected", true)
+      @form_field.options[item.options_index].selected = true
       
       if @is_multiple
         this.choice_build item
       else
-        #@selected_item.down("span").update(item.html)
         Prime.Dom.queryFirst("span", @selected_item).setHTML(item.html)
         this.single_deselect_control_build() if @allow_single_deselect
 
@@ -389,10 +378,33 @@ class Chosen extends AbstractChosen
 
       @search_field.setValue ""
       
-      @form_field.fireEvent("change") if typeof Event.simulate is 'function' && (@is_multiple || @form_field.value != @current_value)
-      @current_value = @form_field.getValue
+      @prime_field.fireEvent("change") if typeof Event.simulate is 'function' && (@is_multiple || @prime_field.getValue() != @current_value)
+      @current_value = @prime_field.getValue()
       
       this.search_field_scale()
+
+    else if @allow_custom_value
+      value = @search_field.getValue()
+      group = add_unique_custom_group()
+      @custom_choice_temp.appendTo(group, {'value':value})
+
+      group.appendTo(@prime_field) if group.domElement.parentNode is null
+      @form_field.options[@form_field.options.length-1].selected = true
+
+      @results_hide() unless evt.metaKey
+      @results_build()
+
+  find_custom_group: ->
+    found = group for group in Prime.Dom.query('optgroup', @prime_field) when group.getAttribute('label') is @custom_group_text
+
+    found
+
+  add_unique_custom_group: ->
+    group = find_custom_group()
+    if not group
+      group = Prime.Dom.newElement('optgroup', {'label':@custom_group_text})
+    
+    group
 
   result_activate: (el) ->
     el.addClass "active-result"
@@ -404,21 +416,17 @@ class Chosen extends AbstractChosen
     result_data = @results_data[pos]
     result_data.selected = false
 
-    #@form_field.options[result_data.options_index].selected = false
-    Prime.Dom.query("option", @form_field)[result_data.options_index].setAttribute("selected", false)
-    #result = $(@container_id + "_o_" + pos)
+    @form_field.options[result_data.options_index].selected = false
     result = Prime.Dom.queryByID(@container_id + "_o_" + pos)
     result.removeClass("result-selected").addClass("active-result").show()
 
     this.result_clear_highlight()
     this.winnow_results()
 
-    @form_field.fireEvent("change") if typeof Event.simulate is 'function'
+    @prime_field.fireEvent("change") if typeof Event.simulate is 'function'
     this.search_field_scale()
     
   single_deselect_control_build: ->
-    #@selected_item.down("span").insert { after: "<abbr class=\"search-choice-close\"></abbr>" } if @allow_single_deselect and not @selected_item.down("abbr")
-    #Prime.Dom.queryFirst("span", @selected_item).append(Prime.Dom.newElement("<abbr/>",{'class':'search-choice-close'})) if @allow_single_deselect and not Prime.Dom.queryFirst("abbr", @selected_item)
     Prime.Dom.newElement("<abbr/>", {'class':'search-choice-close'}).appendTo(Prime.Dom.queryFirst("span", @selected_item)) if @allow_single_deselect and not Prime.Dom.queryFirst("abbr", @selected_item)
     
   winnow_results: ->
@@ -430,13 +438,15 @@ class Chosen extends AbstractChosen
     regexAnchor = if @search_contains then "" else "^"
     regex = new RegExp(regexAnchor + searchText.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"), 'i')
     zregex = new RegExp(searchText.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"), 'i')
-
+    
     for option in @results_data
       if not option.disabled and not option.empty
         if option.group
-          Prime.Dom.query("option", @form_field)[option.options_index].hide()
+          Prime.Dom.queryByID(option.dom_id).hide()
         else if not (@is_multiple and option.selected)
           found = false
+          result_id = option.dom_id
+          el = Prime.Dom.queryByID(result_id)
           
           if regex.test option.html
             found = true
@@ -457,24 +467,22 @@ class Chosen extends AbstractChosen
               text = text.substr(0, startpos) + '<em>' + text.substr(startpos)
             else
               text = option.html
-            #$(result_id).update text if $(result_id).innerHTML != text
-            Prime.Dom.query("option", @form_field)[option.options_index].setHTML(text)
-              
-            this.result_activate Prime.Dom.queryByID(option.dom_id)
+            
+            el.setHTML(text)  
+            this.result_activate el
 
-            Prime.Dom.query("optgroup", @form_field)[option.group_array_index].setStyle({display: 'list-item'}) if option.group_array_index?
+            Prime.Dom.queryByID(@results_data[option.group_array_index].dom_id).setStyle('display', 'list-item') if option.group_array_index?
           else
             this.result_clear_highlight() if option is @result_highlight
-            this.result_deactivate Prime.Dom.query("option", @form_field)[option.options_index]
+            this.result_deactivate el
 
     if results < 1 and searchText.length
       this.no_results(searchText)
-    else
+    else    
       this.winnow_results_set_highlight()
 
   winnow_results_clear: ->
     @search_field.setValue ''
-    #lis = @search_results.select("li")
     lis = Prime.Dom.query("li", @search_results)
     
     for li in lis
@@ -487,36 +495,28 @@ class Chosen extends AbstractChosen
     if not @result_highlight
 
       if not @is_multiple
-        #do_high = @search_results.down(".result-selected.active-result")
         do_high = Prime.Dom.queryFirst(".result-selected.active-result", @search_results)
 
       if not do_high?
-        #do_high = @search_results.down(".active-result")
         do_high = Prime.Dom.queryFirst(".active-result", @search_results)
 
       this.result_do_highlight do_high if do_high?
   
   no_results: (terms) ->
-    #@search_results.insert @no_results_temp.evaluate( terms: terms )
-    @no_results_temp.appendTo(@search_results, terms)
+    @no_results_temp.appendTo(@search_results, {'terms':terms})
     
   no_results_clear: ->
     nr = null
-    #nr.remove() while nr = @search_results.down(".no-results")
     Prime.Dom.query(".no-results", @search_results).each () -> this.removeFromDOM()
 
 
   keydown_arrow: ->
-    #actives = @search_results.select("li.active-result")
     actives = Prime.Dom.query("li.active-result", @search_results)
     if actives.length
       if not @result_highlight
         this.result_do_highlight actives[0]
       else if @results_showing
-        #sibs = @result_highlight.nextSiblings()
-        #nexts = sibs.intersect(actives)
-        #this.result_do_highlight nexts.first() if nexts.length
-        idx = actives.indexOf @results_showing
+        idx = actives.indexOf @result_highlight
         this.result_do_highlight actives[idx + 1] if idx < actives.length - 1
       this.results_show() if not @results_showing
 
@@ -524,14 +524,11 @@ class Chosen extends AbstractChosen
     if not @results_showing and not @is_multiple
       this.results_show()
     else if @result_highlight
-      #sibs = @result_highlight.previousSiblings()
-      #actives = @search_results.select("li.active-result")
-      #prevs = sibs.intersect(actives)
       actives = Prime.Dom.query("li.active-result", @search_results)
       idx = actives.indexOf @result_highlight
       
       if idx > 0
-        this.result_do_highlight actives[0]
+        this.result_do_highlight actives[idx - 1]
       else
         this.results_hide() if @choices > 0
         this.result_clear_highlight()
@@ -541,7 +538,7 @@ class Chosen extends AbstractChosen
       this.choice_destroy Prime.Dom.queryFirst("a", @pending_backstroke)
       this.clear_backstroke()
     else
-      siblings = Prime.Dom.query("li.search-choice", @search_container)
+      siblings = Prime.Dom.query("li.search-choice", @search_container.parent())
       @pending_backstroke = siblings[siblings.length - 1]
       if @single_backstroke_delete
         @keydown_backstroke()
@@ -560,7 +557,7 @@ class Chosen extends AbstractChosen
     
     switch stroke
       when 8
-        @backstroke_length = this.search_field.value.length
+        @backstroke_length = this.search_field.getValue().length
         break
       when 9
         this.result_select(evt) if this.results_showing and not @is_multiple
@@ -576,11 +573,11 @@ class Chosen extends AbstractChosen
       when 40
         this.keydown_arrow()
         break
-
+        
   search_field_scale: ->
     if @is_multiple
-      #not as fancy as other implementations but we don't have great measuring facilities in Prime-JS
-      @search_field.setStyles({'width': (@f_width - 10) + 'px'})
+      #not as fancy as other implementations but we don't have much in the way of measuring facilities in Prime-JS
+      @search_field.setStyles({'width': (@f_width / 2) + 'px'})
 
       dd_top = @container.getComputedStyle()['height']
       @dropdown.setStyles({"top":  dd_top + "px"})
