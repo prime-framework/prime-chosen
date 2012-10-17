@@ -20,6 +20,11 @@ javascripts = {
     'coffee/lib/abstract-chosen.coffee'
     'coffee/chosen.proto.coffee'
   ]
+  'chosen/chosen.prime.js': [
+    'coffee/lib/select-parser.coffee'
+    'coffee/lib/abstract-chosen.coffee'
+    'coffee/chosen.prime.coffee'
+  ]
 }
 
 Array::unique = ->
