@@ -1189,7 +1189,7 @@
       </div>
       <div>
         <em>Multiple Select</em>
-        <select data-placeholder="Your Favorite Types of Bear" style="width:350px;" multiple class="chzn-select chzn-custom-value" tabindex="8">
+        <select data-placeholder="Your Favorite Types of Bear" style="width:350px;" multiple class="chzn-select" tabindex="8">
           <option value=""></option>
           <option>American Black Bear</option>
           <option>Asiatic Black Bear</option>
@@ -1297,6 +1297,39 @@
         </li>
       </ul>
     </div>
+
+    <h2>Add Custom Values</h2>
+    <div class="side-by-side clearfix">
+      <p>Chosen can be set up to allow users to add custom values to the select box option.</p>
+      <code>&lt;select <strong>data-placeholder="Choose a country..."</strong> style="width:350px;" multiple class="chzn-select chzn-custom-value"&gt;</code>
+      <p><strong>Note:</strong> Single value chosen's with the custom value setting will allow a user to add multiple custom values, but only submit one.</p>
+		</div>
+		<div class="side-by-side clearfix">
+		  <div>
+		    <em>Single select custom value</em>
+		    <select data-placeholder="Your Favorite Type of Bear" style="width:350px;" class="chzn-select chzn-custom-value" tabindex="9">
+		      <option value=""></option>
+		      <option>American Black Bear</option>
+		      <option>Asiatic Black Bear</option>
+		      <option>Brown Bear</option>
+		      <option>Giant Panda</option>
+		      <option selected>Sloth Bear</option>
+		      <option>Polar Bear</option>
+		    </select>
+		  </div>
+		  <div>
+		    <em>Multiple select custom value</em>
+		    <select data-placeholder="Your Favorite Types of Bear" style="width:350px;" multiple class="chzn-select  chzn-custom-value" tabindex="10">
+		      <option value=""></option>
+		      <option>American Black Bear</option>
+		      <option>Asiatic Black Bear</option>
+		      <option>Brown Bear</option>
+		      <option>Giant Panda</option>
+		      <option selected>Sloth Bear</option>
+		      <option selected>Polar Bear</option>
+		    </select>
+		  </div>
+		</div>
 
     <h2>Setup (for jQuery)</h2>
     <p>Using Chosen is easy as can be.</p>

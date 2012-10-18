@@ -315,6 +315,7 @@ Copyright (c) 2012 by Inversoft
       this.form_field = form_field;
       this.options = options != null ? options : {};
       this.prime_field = this.form_field instanceof Prime.Dom.Element ? this.form_field : new Prime.Dom.Element(this.form_field);
+      this.prime_field.chosen = this;
       this.form_field = this.prime_field.domElement;
       Chosen.__super__.constructor.call(this, this.form_field, this.options);
     }
@@ -334,11 +335,9 @@ Copyright (c) 2012 by Inversoft
       this.single_temp = new Prime.Dom.Template('<a href="javascript:void(0)" class="chzn-single chzn-default"><span>#{default}</span><div><b></b></div></a><div class="chzn-drop" style="left:-9000px;"><div class="chzn-search"><input type="text" autocomplete="off" /></div><ul class="chzn-results"></ul></div>');
       this.multi_temp = new Prime.Dom.Template('<ul class="chzn-choices"><li class="search-field"><input type="text" value="#{default}" class="default" autocomplete="off" style="width:25px;" /></li></ul><div class="chzn-drop" style="left:-9000px;"><ul class="chzn-results"></ul></div>');
       this.choice_temp = new Prime.Dom.Template('<li class="search-choice" id="#{id}"><span>#{choice}</span><a href="javascript:void(0)" class="search-choice-close" rel="#{position}"></a></li>');
-      this.no_results_temp = new Prime.Dom.Template('<li class="no-results">' + this.results_none_found + ' "<span>#{terms}</span>"</li>');
+      this.no_results_temp = new Prime.Dom.Template('<li class="no-results">#{message} "<span>#{terms}</span>"</li>');
       this.group_temp = new Prime.Dom.Template('<li id="#{id}" class="group-result" style="display: list-item">#{label}</li>');
-      if (this.allow_custom_value) {
-        return this.custom_choice_temp = new Prime.Dom.Template('<option value="#{value}">#{value}</option>');
-      }
+      return this.custom_choice_temp = new Prime.Dom.Template('<option value="#{value}" selected="selected">#{value}</option>');
     };
 
     Chosen.prototype.set_up_html = function() {
@@ -545,7 +544,9 @@ Copyright (c) 2012 by Inversoft
       this.parsing = true;
       this.results_data = root.SelectParser.select_to_array(this.form_field);
       if (this.is_multiple && this.choices > 0) {
-        Prime.Dom.queryFirst("li.search-choice", this.search_choices).removeFromDOM();
+        Prime.Dom.query("li.search-choice", this.search_choices).each(function() {
+          return this.removeFromDOM();
+        });
         this.choices = 0;
       } else if (!this.is_multiple) {
         this.selected_item.addClass("chzn-default");
@@ -632,7 +633,7 @@ Copyright (c) 2012 by Inversoft
         });
         return false;
       }
-      dd_top = this.is_multiple ? this.container.getComputedStyle()['height'] : this.container.getComputedStyle()['height'] - 1;
+      dd_top = this.is_multiple ? parse_dimension(this.container.getComputedStyle()['height']) : parse_dimension(this.container.getComputedStyle()['height']) - 1;
       this.prime_field.fireEvent("liszt:showing_dropdown", {
         chosen: this
       });
@@ -770,9 +771,7 @@ Copyright (c) 2012 by Inversoft
       }
       this.show_search_field_default();
       this.results_reset_cleanup();
-      if (typeof Event.simulate === 'function') {
-        this.prime_field.fireEvent("change");
-      }
+      this.prime_field.fireEvent("change");
       if (this.active_field) {
         return this.results_hide();
       }
@@ -824,14 +823,13 @@ Copyright (c) 2012 by Inversoft
         return this.search_field_scale();
       } else if (this.allow_custom_value) {
         value = this.search_field.getValue();
-        group = add_unique_custom_group();
+        group = this.add_unique_custom_group();
         this.custom_choice_temp.appendTo(group, {
           'value': value
         });
-        if (group.domElement.parentNode === null) {
+        if (group.parent() === null) {
           group.appendTo(this.prime_field);
         }
-        this.form_field.options[this.form_field.options.length - 1].selected = true;
         if (!evt.metaKey) {
           this.results_hide();
         }
@@ -853,9 +851,9 @@ Copyright (c) 2012 by Inversoft
 
     Chosen.prototype.add_unique_custom_group = function() {
       var group;
-      group = find_custom_group();
+      group = this.find_custom_group();
       if (!group) {
-        group = Prime.Dom.newElement('optgroup', {
+        group = Prime.Dom.newElement('<optgroup/>', {
           'label': this.custom_group_text
         });
       }
@@ -940,7 +938,7 @@ Copyright (c) 2012 by Inversoft
                 Prime.Dom.queryByID(this.results_data[option.group_array_index].dom_id).setStyle('display', 'list-item');
               }
             } else {
-              if (option === this.result_highlight) {
+              if ((this.result_highlight != null) && option.dom_id === this.result_highlight.id) {
                 this.result_clear_highlight();
               }
               this.result_deactivate(el);
@@ -990,7 +988,8 @@ Copyright (c) 2012 by Inversoft
 
     Chosen.prototype.no_results = function(terms) {
       return this.no_results_temp.appendTo(this.search_results, {
-        'terms': terms
+        'terms': terms,
+        'message': this.results_none_found
       });
     };
 

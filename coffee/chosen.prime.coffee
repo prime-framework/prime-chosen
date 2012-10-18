@@ -8,6 +8,7 @@ class Chosen extends AbstractChosen
 
   constructor: (@form_field, @options={}) ->
     @prime_field = if @form_field instanceof Prime.Dom.Element then @form_field else new Prime.Dom.Element(@form_field)
+    @prime_field.chosen = this;
     @form_field = @prime_field.domElement
     super(@form_field, @options)
 
@@ -26,9 +27,9 @@ class Chosen extends AbstractChosen
     @single_temp = new Prime.Dom.Template('<a href="javascript:void(0)" class="chzn-single chzn-default"><span>#{default}</span><div><b></b></div></a><div class="chzn-drop" style="left:-9000px;"><div class="chzn-search"><input type="text" autocomplete="off" /></div><ul class="chzn-results"></ul></div>')
     @multi_temp = new Prime.Dom.Template('<ul class="chzn-choices"><li class="search-field"><input type="text" value="#{default}" class="default" autocomplete="off" style="width:25px;" /></li></ul><div class="chzn-drop" style="left:-9000px;"><ul class="chzn-results"></ul></div>')
     @choice_temp = new Prime.Dom.Template('<li class="search-choice" id="#{id}"><span>#{choice}</span><a href="javascript:void(0)" class="search-choice-close" rel="#{position}"></a></li>')
-    @no_results_temp = new Prime.Dom.Template('<li class="no-results">' + @results_none_found + ' "<span>#{terms}</span>"</li>')
+    @no_results_temp = new Prime.Dom.Template('<li class="no-results">#{message} "<span>#{terms}</span>"</li>')
     @group_temp = new Prime.Dom.Template('<li id="#{id}" class="group-result" style="display: list-item">#{label}</li>')
-    @custom_choice_temp = new Prime.Dom.Template('<option value="#{value}">#{value}</option>') if @allow_custom_value;
+    @custom_choice_temp = new Prime.Dom.Template('<option value="#{value}" selected="selected">#{value}</option>')
 
   set_up_html: ->
     @container_id = @form_field.id.replace(/[^\w]/g, '_') + "_chzn"
@@ -179,7 +180,7 @@ class Chosen extends AbstractChosen
     @results_data = root.SelectParser.select_to_array(@form_field)
 
     if @is_multiple and @choices > 0
-      Prime.Dom.queryFirst("li.search-choice", @search_choices).removeFromDOM()
+      Prime.Dom.query("li.search-choice", @search_choices).each () -> this.removeFromDOM()
       @choices = 0
     else if not @is_multiple
       @selected_item.addClass("chzn-default")
@@ -249,8 +250,8 @@ class Chosen extends AbstractChosen
     else if @max_selected_options <= @choices
       @prime_field.fireEvent("liszt:maxselected", {chosen: this})
       return false
-
-    dd_top = if @is_multiple then @container.getComputedStyle()['height'] else (@container.getComputedStyle()['height'] - 1)
+    
+    dd_top = if @is_multiple then parse_dimension(@container.getComputedStyle()['height']) else (parse_dimension(@container.getComputedStyle()['height']) - 1)
     @prime_field.fireEvent("liszt:showing_dropdown", {chosen: this})
     @dropdown.setStyles {"top":  dd_top + "px", "left":0}
     @results_showing = true
@@ -341,7 +342,7 @@ class Chosen extends AbstractChosen
     @selected_item.addClass("chzn-default") if not @is_multiple    
     this.show_search_field_default()
     this.results_reset_cleanup()
-    @prime_field.fireEvent("change") if typeof Event.simulate is 'function'
+    @prime_field.fireEvent("change") #if typeof Event.simulate is 'function'
     this.results_hide() if @active_field
 
   results_reset_cleanup: ->
@@ -385,11 +386,10 @@ class Chosen extends AbstractChosen
 
     else if @allow_custom_value
       value = @search_field.getValue()
-      group = add_unique_custom_group()
+      group = @add_unique_custom_group()
       @custom_choice_temp.appendTo(group, {'value':value})
 
-      group.appendTo(@prime_field) if group.domElement.parentNode is null
-      @form_field.options[@form_field.options.length-1].selected = true
+      group.appendTo(@prime_field) if group.parent() is null
 
       @results_hide() unless evt.metaKey
       @results_build()
@@ -400,9 +400,9 @@ class Chosen extends AbstractChosen
     found
 
   add_unique_custom_group: ->
-    group = find_custom_group()
+    group = @find_custom_group()
     if not group
-      group = Prime.Dom.newElement('optgroup', {'label':@custom_group_text})
+      group = Prime.Dom.newElement('<optgroup/>', {'label':@custom_group_text})
     
     group
 
@@ -473,7 +473,7 @@ class Chosen extends AbstractChosen
 
             Prime.Dom.queryByID(@results_data[option.group_array_index].dom_id).setStyle('display', 'list-item') if option.group_array_index?
           else
-            this.result_clear_highlight() if option is @result_highlight
+            this.result_clear_highlight() if @result_highlight? and option.dom_id is @result_highlight.id
             this.result_deactivate el
 
     if results < 1 and searchText.length
@@ -503,7 +503,7 @@ class Chosen extends AbstractChosen
       this.result_do_highlight do_high if do_high?
   
   no_results: (terms) ->
-    @no_results_temp.appendTo(@search_results, {'terms':terms})
+    @no_results_temp.appendTo(@search_results, {'terms':terms, 'message': @results_none_found})
     
   no_results_clear: ->
     nr = null
