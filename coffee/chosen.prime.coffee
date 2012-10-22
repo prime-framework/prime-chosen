@@ -6,8 +6,12 @@ root = this
 
 class Chosen extends AbstractChosen
 
+  @CHOSEN_ANONYMOUS_ID: 1
+
   constructor: (@form_field, @options={}) ->
     @prime_field = if @form_field instanceof Prime.Dom.Element then @form_field else new Prime.Dom.Element(@form_field)
+    id = @prime_field.getID()
+    @prime_field.setID("chosen_" + Chosen.CHOSEN_ANONYMOUS_ID++) if (id? or id is "")
     @prime_field.chosen = this;
     @form_field = @prime_field.domElement
     super(@form_field, @options)
@@ -32,7 +36,7 @@ class Chosen extends AbstractChosen
     @custom_choice_temp = new Prime.Dom.Template('<option value="#{value}" selected="selected">#{value}</option>')
 
   set_up_html: ->
-    @container_id = @form_field.id.replace(/[^\w]/g, '_') + "_chzn"
+    @container_id = @prime_field.getID().replace(/[^\w]/g, '_') + "_chzn"
     
     @f_width = if @prime_field.getStyle("width") then parseInt @prime_field.getStyle("width"), 10 else @prime_field.getComputedStyle()['width']
     
@@ -75,26 +79,26 @@ class Chosen extends AbstractChosen
     @prime_field.fireEvent("liszt:ready", {chosen: this})
 
   register_observers: ->
-    @container.withEventListener "mousedown", (evt) => this.container_mousedown(evt)
-    @container.withEventListener "mouseup", (evt) => this.container_mouseup(evt)
-    @container.withEventListener "mouseenter", (evt) => this.mouse_enter(evt)
-    @container.withEventListener "mouseleave", (evt) => this.mouse_leave(evt)
+    @container.addEventListener "mousedown", (evt) => this.container_mousedown(evt)
+    @container.addEventListener "mouseup", (evt) => this.container_mouseup(evt)
+    @container.addEventListener "mouseenter", (evt) => this.mouse_enter(evt)
+    @container.addEventListener "mouseleave", (evt) => this.mouse_leave(evt)
     
-    @search_results.withEventListener "mouseup", (evt) => this.search_results_mouseup(evt)
-    @search_results.withEventListener "mouseover", (evt) => this.search_results_mouseover(evt)
-    @search_results.withEventListener "mouseout", (evt) => this.search_results_mouseout(evt)
+    @search_results.addEventListener "mouseup", (evt) => this.search_results_mouseup(evt)
+    @search_results.addEventListener "mouseover", (evt) => this.search_results_mouseover(evt)
+    @search_results.addEventListener "mouseout", (evt) => this.search_results_mouseout(evt)
     
-    @prime_field.withEventListener "liszt:updated", (evt) => this.results_update_field(evt)
+    @prime_field.addEventListener "liszt:updated", (evt) => this.results_update_field(evt)
 
-    @search_field.withEventListener "blur", (evt) => this.input_blur(evt)
-    @search_field.withEventListener "keyup", (evt) => this.keyup_checker(evt)
-    @search_field.withEventListener "keydown", (evt) => this.keydown_checker(evt)
+    @search_field.addEventListener "blur", (evt) => this.input_blur(evt)
+    @search_field.addEventListener "keyup", (evt) => this.keyup_checker(evt)
+    @search_field.addEventListener "keydown", (evt) => this.keydown_checker(evt)
 
     if @is_multiple
-      @search_choices.withEventListener "click", (evt) => this.choices_click(evt)
-      @search_field.withEventListener "focus", (evt) => this.input_focus(evt)
+      @search_choices.addEventListener "click", (evt) => this.choices_click(evt)
+      @search_field.addEventListener "focus", (evt) => this.input_focus(evt)
     else
-      @container.withEventListener "click", (evt) => evt.preventDefault() # gobble click of anchor
+      @container.addEventListener "click", (evt) => evt.preventDefault() # gobble click of anchor
 
   prepare_event: (evt) ->
     if evt.target
@@ -106,13 +110,13 @@ class Chosen extends AbstractChosen
       @container.addClass 'chzn-disabled'
       #setAttribute didn't work for this
       @search_field.domElement.disabled = true
-      @selected_item.removeEventListener "focus", @activate_proxy if !@is_multiple
+      @selected_item.removeEventListener "focus" if !@is_multiple
       this.close_field()
     else
       @container.removeClass 'chzn-disabled'
       #setAttribute didn't work for this
       @search_field.domElement.disabled = false
-      @activate_proxy = @selected_item.addEventListener "focus", @activate_action if !@is_multiple
+      @selected_item.addEventListener "focus", @activate_action if !@is_multiple
 
   container_mousedown: (evt) ->
     prime_target = if evt? then new Prime.Dom.Element(evt.target) else false
@@ -126,7 +130,7 @@ class Chosen extends AbstractChosen
           @search_field.setValue('') if @is_multiple
           @click_test_proxy = Prime.Dom.Document.addEventListener "click", @click_test_action
           this.results_show()
-        else if not @is_multiple and evt and (prime_target is @selected_item || Prime.Dom.ancestor("a.chzn-single", prime_target) != null)
+        else if not @is_multiple and evt and (prime_target is @selected_item || Prime.Dom.queryUp("a.chzn-single", prime_target) != null)
           this.results_toggle()
 
         this.activate_field()
@@ -170,7 +174,7 @@ class Chosen extends AbstractChosen
 
   test_active_click: (evt) ->
     prime_target = if evt? then new Prime.Dom.Element(evt.target) else false
-    if prime_target and Prime.Dom.ancestor('#' + @container_id, prime_target) != null
+    if prime_target and Prime.Dom.queryUp('#' + @container_id, prime_target) != null
       @active_field = true
     else
       this.close_field()
@@ -227,11 +231,11 @@ class Chosen extends AbstractChosen
     styles = @search_results.getComputedStyle()
     
     maxHeight = parseInt styles['maxHeight'], 10
-    visible_top = styles['scrollTop']
+    visible_top = @search_results.domElement.scrollTop
     visible_bottom = maxHeight + visible_top
-
-    high_top = @result_highlight.position()['top']
-    high_bottom = high_top + @result_highlight.getComputedStyle()['height']
+    
+    high_top = calculate_position(@result_highlight)['top']
+    high_bottom = high_top + parseInt(@result_highlight.getComputedStyle()['height'], 10)
 
     if high_bottom >= visible_bottom
       @search_results.domElement.scrollTop = if (high_bottom - maxHeight) > 0 then (high_bottom - maxHeight) else 0
@@ -290,24 +294,24 @@ class Chosen extends AbstractChosen
 
   search_results_mouseup: (evt) ->
     prime_target = if evt? then new Prime.Dom.Element(evt.target) else false
-    target = if prime_target and prime_target.hasClass("active-result") then prime_target else Prime.Dom.ancestor(".active-result", prime_target)
+    target = if prime_target and prime_target.hasClass("active-result") then prime_target else Prime.Dom.queryUp(".active-result", prime_target)
     if prime_target
       @result_highlight = prime_target
       this.result_select(evt)
 
   search_results_mouseover: (evt) ->
     prime_target = if evt? then new Prime.Dom.Element(evt.target) else false
-    target = if prime_target.hasClass("active-result") then prime_target else Prime.Dom.ancestor(".active-result", prime_target)
+    target = if prime_target.hasClass("active-result") then prime_target else Prime.Dom.queryUp(".active-result", prime_target)
     this.result_do_highlight( target ) if target
 
   search_results_mouseout: (evt) ->
     prime_target = if evt? then new Prime.Dom.Element(evt.target) else false
-    this.result_clear_highlight() if prime_target and prime_target.hasClass('active-result') or Prime.Dom.ancestor(".active-result", prime_target)
+    this.result_clear_highlight() if prime_target and prime_target.hasClass('active-result') or Prime.Dom.queryUp(".active-result", prime_target)
 
   choices_click: (evt) ->
     evt.preventDefault()
     prime_target = if evt? then new Prime.Dom.Element(evt.target) else false
-    if( @active_field and not(prime_target.hasClass('search-choice') or Prime.Dom.ancestor(".search-choice", prime_target)) and not @results_showing )
+    if( @active_field and not(prime_target.hasClass('search-choice') or Prime.Dom.queryUp(".search-choice", prime_target)) and not @results_showing )
       this.results_show()
 
   choice_build: (item) ->
@@ -334,7 +338,7 @@ class Chosen extends AbstractChosen
     this.results_hide() if @is_multiple and @choices > 0 and @search_field.getValue().length < 1
 
     this.result_deselect link.getAttribute("rel")
-    Prime.Dom.ancestor('li', link).removeFromDOM()
+    Prime.Dom.queryUp('li', link).removeFromDOM()
 
   results_reset: ->
     @form_field.options[0].selected = true
@@ -363,7 +367,7 @@ class Chosen extends AbstractChosen
       
       high.addClass("result-selected")
         
-      position = high.id.substr(high.id.lastIndexOf("_") + 1 )
+      position = high.getID().substr(high.getID().lastIndexOf("_") + 1 )
       item = @results_data[position]
       item.selected = true
 
@@ -473,7 +477,7 @@ class Chosen extends AbstractChosen
 
             Prime.Dom.queryByID(@results_data[option.group_array_index].dom_id).setStyle('display', 'list-item') if option.group_array_index?
           else
-            this.result_clear_highlight() if @result_highlight? and option.dom_id is @result_highlight.id
+            this.result_clear_highlight() if @result_highlight? and option.dom_id is @result_highlight.getID()
             this.result_deactivate el
 
     if results < 1 and searchText.length
@@ -576,9 +580,30 @@ class Chosen extends AbstractChosen
         
   search_field_scale: ->
     if @is_multiple
-      #not as fancy as other implementations but we don't have much in the way of measuring facilities in Prime-JS
-      @search_field.setStyles({'width': (@f_width / 2) + 'px'})
+      
+      w = 0
 
+      style_block = "position:absolute; left: -1000px; top: -1000px; visibility:hidden;"
+      styles = ['font-size','font-style', 'font-weight', 'font-family','line-height', 'text-transform', 'letter-spacing']
+      
+      for style in styles
+        style_block += style + ":" + @search_field.getStyle(style) + ";"
+      
+      div = Prime.Dom.newElement('<div/>', { 'style' : style_block }).setHTML(@search_field.getValue().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))
+      div.appendTo(Prime.Dom.queryFirst('body'))
+      
+      comp = div.getComputedStyle()
+      w = parse_dimension(comp['width']) + parse_dimension(comp['paddingLeft']) + parse_dimension(comp['paddingRight']) + parse_dimension(comp['borderLeftWidth']) + parse_dimension(comp['borderRightWidth']) + 25
+
+      div.removeFromDOM()
+
+      if( w > @f_width-10 )
+        w = @f_width - 10
+      
+      #not as fancy as other implementations but we don't have much in the way of measuring facilities in Prime-JS
+      #@search_field.setStyles({'width': (@f_width / 2) + 'px'})
+      @search_field.setStyles({'width': w + 'px'})
+      
       dd_top = @container.getComputedStyle()['height']
       @dropdown.setStyles({"top":  dd_top + "px"})
 
@@ -588,8 +613,28 @@ get_side_border_padding = (elmt) ->
   layout = elmt.getComputedStyle();
   side_border_padding = parse_dimension(layout["borderLeftWidth"]) + parse_dimension(layout["borderRightWidth"]) + parse_dimension(layout["paddingLeft"]) + parse_dimension(layout["paddingRight"])
   
+calculate_position = (elmt) ->
+  styles = elmt.getComputedStyle()
+  # positionLeft = -(parse_dimension(styles['margin-left']))
+  # positionTop = -(parse_dimension(styles['margin-top']))
+  positionLeft = parseInt(elmt.domElement.offsetLeft, 10) - parseInt(styles['margin-left'], 10)
+  positionTop = parseInt(elmt.domElement.offsetTop, 10) - parseInt(styles['margin-top'], 10)
+  
+  element = elmt.parent()
+  while (element?)
+    position = element.getComputedStyle()['position']
+    if (element.type is 'body' or (position is 'relative' or position is 'absolute'))
+      break;
+    else
+      positionLeft += parseInt(element.offsetLeft, 10)
+      positionTop += parseInt(element.offsetTop, 10)
+    element = element.parent()
+  
+  {'top': positionTop, 'left': positionLeft}
+  
 parse_dimension = (dim) ->
-  parseInt dim.substring(0, dim.indexOf("px")), 10
+  if dim.indexOf("px") > 0 then parseInt(dim.substring(0, dim.indexOf("px")), 10) else parseInt(dim, 10)
 
 root.get_side_border_padding = get_side_border_padding
+root.calculate_position = calculate_position
 root.parse_dimension = parse_dimension

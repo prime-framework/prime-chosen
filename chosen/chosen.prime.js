@@ -301,7 +301,7 @@ Copyright (c) 2012 by Inversoft
 
 
 (function() {
-  var Chosen, get_side_border_padding, parse_dimension, root,
+  var Chosen, calculate_position, get_side_border_padding, parse_dimension, root,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -311,10 +311,17 @@ Copyright (c) 2012 by Inversoft
 
     __extends(Chosen, _super);
 
+    Chosen.CHOSEN_ANONYMOUS_ID = 1;
+
     function Chosen(form_field, options) {
+      var id;
       this.form_field = form_field;
       this.options = options != null ? options : {};
       this.prime_field = this.form_field instanceof Prime.Dom.Element ? this.form_field : new Prime.Dom.Element(this.form_field);
+      id = this.prime_field.getID();
+      if ((id != null) || id === "") {
+        this.prime_field.setID("chosen_" + Chosen.CHOSEN_ANONYMOUS_ID++);
+      }
       this.prime_field.chosen = this;
       this.form_field = this.prime_field.domElement;
       Chosen.__super__.constructor.call(this, this.form_field, this.options);
@@ -342,7 +349,7 @@ Copyright (c) 2012 by Inversoft
 
     Chosen.prototype.set_up_html = function() {
       var base_template, container_props, dd_top, dd_width, sf_width;
-      this.container_id = this.form_field.id.replace(/[^\w]/g, '_') + "_chzn";
+      this.container_id = this.prime_field.getID().replace(/[^\w]/g, '_') + "_chzn";
       this.f_width = this.prime_field.getStyle("width") ? parseInt(this.prime_field.getStyle("width"), 10) : this.prime_field.getComputedStyle()['width'];
       container_props = {
         'id': this.container_id,
@@ -394,48 +401,48 @@ Copyright (c) 2012 by Inversoft
 
     Chosen.prototype.register_observers = function() {
       var _this = this;
-      this.container.withEventListener("mousedown", function(evt) {
+      this.container.addEventListener("mousedown", function(evt) {
         return _this.container_mousedown(evt);
       });
-      this.container.withEventListener("mouseup", function(evt) {
+      this.container.addEventListener("mouseup", function(evt) {
         return _this.container_mouseup(evt);
       });
-      this.container.withEventListener("mouseenter", function(evt) {
+      this.container.addEventListener("mouseenter", function(evt) {
         return _this.mouse_enter(evt);
       });
-      this.container.withEventListener("mouseleave", function(evt) {
+      this.container.addEventListener("mouseleave", function(evt) {
         return _this.mouse_leave(evt);
       });
-      this.search_results.withEventListener("mouseup", function(evt) {
+      this.search_results.addEventListener("mouseup", function(evt) {
         return _this.search_results_mouseup(evt);
       });
-      this.search_results.withEventListener("mouseover", function(evt) {
+      this.search_results.addEventListener("mouseover", function(evt) {
         return _this.search_results_mouseover(evt);
       });
-      this.search_results.withEventListener("mouseout", function(evt) {
+      this.search_results.addEventListener("mouseout", function(evt) {
         return _this.search_results_mouseout(evt);
       });
-      this.prime_field.withEventListener("liszt:updated", function(evt) {
+      this.prime_field.addEventListener("liszt:updated", function(evt) {
         return _this.results_update_field(evt);
       });
-      this.search_field.withEventListener("blur", function(evt) {
+      this.search_field.addEventListener("blur", function(evt) {
         return _this.input_blur(evt);
       });
-      this.search_field.withEventListener("keyup", function(evt) {
+      this.search_field.addEventListener("keyup", function(evt) {
         return _this.keyup_checker(evt);
       });
-      this.search_field.withEventListener("keydown", function(evt) {
+      this.search_field.addEventListener("keydown", function(evt) {
         return _this.keydown_checker(evt);
       });
       if (this.is_multiple) {
-        this.search_choices.withEventListener("click", function(evt) {
+        this.search_choices.addEventListener("click", function(evt) {
           return _this.choices_click(evt);
         });
-        return this.search_field.withEventListener("focus", function(evt) {
+        return this.search_field.addEventListener("focus", function(evt) {
           return _this.input_focus(evt);
         });
       } else {
-        return this.container.withEventListener("click", function(evt) {
+        return this.container.addEventListener("click", function(evt) {
           return evt.preventDefault();
         });
       }
@@ -453,14 +460,14 @@ Copyright (c) 2012 by Inversoft
         this.container.addClass('chzn-disabled');
         this.search_field.domElement.disabled = true;
         if (!this.is_multiple) {
-          this.selected_item.removeEventListener("focus", this.activate_proxy);
+          this.selected_item.removeEventListener("focus");
         }
         return this.close_field();
       } else {
         this.container.removeClass('chzn-disabled');
         this.search_field.domElement.disabled = false;
         if (!this.is_multiple) {
-          return this.activate_proxy = this.selected_item.addEventListener("focus", this.activate_action);
+          return this.selected_item.addEventListener("focus", this.activate_action);
         }
       }
     };
@@ -481,7 +488,7 @@ Copyright (c) 2012 by Inversoft
             }
             this.click_test_proxy = Prime.Dom.Document.addEventListener("click", this.click_test_action);
             this.results_show();
-          } else if (!this.is_multiple && evt && (prime_target === this.selected_item || Prime.Dom.ancestor("a.chzn-single", prime_target) !== null)) {
+          } else if (!this.is_multiple && evt && (prime_target === this.selected_item || Prime.Dom.queryUp("a.chzn-single", prime_target) !== null)) {
             this.results_toggle();
           }
           return this.activate_field();
@@ -532,7 +539,7 @@ Copyright (c) 2012 by Inversoft
     Chosen.prototype.test_active_click = function(evt) {
       var prime_target;
       prime_target = evt != null ? new Prime.Dom.Element(evt.target) : false;
-      if (prime_target && Prime.Dom.ancestor('#' + this.container_id, prime_target) !== null) {
+      if (prime_target && Prime.Dom.queryUp('#' + this.container_id, prime_target) !== null) {
         return this.active_field = true;
       } else {
         return this.close_field();
@@ -602,10 +609,10 @@ Copyright (c) 2012 by Inversoft
       this.result_highlight.addClass("highlighted");
       styles = this.search_results.getComputedStyle();
       maxHeight = parseInt(styles['maxHeight'], 10);
-      visible_top = styles['scrollTop'];
+      visible_top = this.search_results.domElement.scrollTop;
       visible_bottom = maxHeight + visible_top;
-      high_top = this.result_highlight.position()['top'];
-      high_bottom = high_top + this.result_highlight.getComputedStyle()['height'];
+      high_top = calculate_position(this.result_highlight)['top'];
+      high_bottom = high_top + parseInt(this.result_highlight.getComputedStyle()['height'], 10);
       if (high_bottom >= visible_bottom) {
         return this.search_results.domElement.scrollTop = (high_bottom - maxHeight) > 0 ? high_bottom - maxHeight : 0;
       } else if (high_top < visible_top) {
@@ -688,7 +695,7 @@ Copyright (c) 2012 by Inversoft
     Chosen.prototype.search_results_mouseup = function(evt) {
       var prime_target, target;
       prime_target = evt != null ? new Prime.Dom.Element(evt.target) : false;
-      target = prime_target && prime_target.hasClass("active-result") ? prime_target : Prime.Dom.ancestor(".active-result", prime_target);
+      target = prime_target && prime_target.hasClass("active-result") ? prime_target : Prime.Dom.queryUp(".active-result", prime_target);
       if (prime_target) {
         this.result_highlight = prime_target;
         return this.result_select(evt);
@@ -698,7 +705,7 @@ Copyright (c) 2012 by Inversoft
     Chosen.prototype.search_results_mouseover = function(evt) {
       var prime_target, target;
       prime_target = evt != null ? new Prime.Dom.Element(evt.target) : false;
-      target = prime_target.hasClass("active-result") ? prime_target : Prime.Dom.ancestor(".active-result", prime_target);
+      target = prime_target.hasClass("active-result") ? prime_target : Prime.Dom.queryUp(".active-result", prime_target);
       if (target) {
         return this.result_do_highlight(target);
       }
@@ -707,7 +714,7 @@ Copyright (c) 2012 by Inversoft
     Chosen.prototype.search_results_mouseout = function(evt) {
       var prime_target;
       prime_target = evt != null ? new Prime.Dom.Element(evt.target) : false;
-      if (prime_target && prime_target.hasClass('active-result') || Prime.Dom.ancestor(".active-result", prime_target)) {
+      if (prime_target && prime_target.hasClass('active-result') || Prime.Dom.queryUp(".active-result", prime_target)) {
         return this.result_clear_highlight();
       }
     };
@@ -716,7 +723,7 @@ Copyright (c) 2012 by Inversoft
       var prime_target;
       evt.preventDefault();
       prime_target = evt != null ? new Prime.Dom.Element(evt.target) : false;
-      if (this.active_field && !(prime_target.hasClass('search-choice') || Prime.Dom.ancestor(".search-choice", prime_target)) && !this.results_showing) {
+      if (this.active_field && !(prime_target.hasClass('search-choice') || Prime.Dom.queryUp(".search-choice", prime_target)) && !this.results_showing) {
         return this.results_show();
       }
     };
@@ -760,7 +767,7 @@ Copyright (c) 2012 by Inversoft
         this.results_hide();
       }
       this.result_deselect(link.getAttribute("rel"));
-      return Prime.Dom.ancestor('li', link).removeFromDOM();
+      return Prime.Dom.queryUp('li', link).removeFromDOM();
     };
 
     Chosen.prototype.results_reset = function() {
@@ -800,7 +807,7 @@ Copyright (c) 2012 by Inversoft
           this.result_single_selected = high;
         }
         high.addClass("result-selected");
-        position = high.id.substr(high.id.lastIndexOf("_") + 1);
+        position = high.getID().substr(high.getID().lastIndexOf("_") + 1);
         item = this.results_data[position];
         item.selected = true;
         this.form_field.options[item.options_index].selected = true;
@@ -938,7 +945,7 @@ Copyright (c) 2012 by Inversoft
                 Prime.Dom.queryByID(this.results_data[option.group_array_index].dom_id).setStyle('display', 'list-item');
               }
             } else {
-              if ((this.result_highlight != null) && option.dom_id === this.result_highlight.id) {
+              if ((this.result_highlight != null) && option.dom_id === this.result_highlight.getID()) {
                 this.result_clear_highlight();
               }
               this.result_deactivate(el);
@@ -1091,10 +1098,27 @@ Copyright (c) 2012 by Inversoft
     };
 
     Chosen.prototype.search_field_scale = function() {
-      var dd_top;
+      var comp, dd_top, div, style, style_block, styles, w, _i, _len;
       if (this.is_multiple) {
+        w = 0;
+        style_block = "position:absolute; left: -1000px; top: -1000px; visibility:hidden;";
+        styles = ['font-size', 'font-style', 'font-weight', 'font-family', 'line-height', 'text-transform', 'letter-spacing'];
+        for (_i = 0, _len = styles.length; _i < _len; _i++) {
+          style = styles[_i];
+          style_block += style + ":" + this.search_field.getStyle(style) + ";";
+        }
+        div = Prime.Dom.newElement('<div/>', {
+          'style': style_block
+        }).setHTML(this.search_field.getValue().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+        div.appendTo(Prime.Dom.queryFirst('body'));
+        comp = div.getComputedStyle();
+        w = parse_dimension(comp['width']) + parse_dimension(comp['paddingLeft']) + parse_dimension(comp['paddingRight']) + parse_dimension(comp['borderLeftWidth']) + parse_dimension(comp['borderRightWidth']) + 25;
+        div.removeFromDOM();
+        if (w > this.f_width - 10) {
+          w = this.f_width - 10;
+        }
         this.search_field.setStyles({
-          'width': (this.f_width / 2) + 'px'
+          'width': w + 'px'
         });
         dd_top = this.container.getComputedStyle()['height'];
         return this.dropdown.setStyles({
@@ -1115,11 +1139,39 @@ Copyright (c) 2012 by Inversoft
     return side_border_padding = parse_dimension(layout["borderLeftWidth"]) + parse_dimension(layout["borderRightWidth"]) + parse_dimension(layout["paddingLeft"]) + parse_dimension(layout["paddingRight"]);
   };
 
+  calculate_position = function(elmt) {
+    var element, position, positionLeft, positionTop, styles;
+    styles = elmt.getComputedStyle();
+    positionLeft = parseInt(elmt.domElement.offsetLeft, 10) - parseInt(styles['margin-left'], 10);
+    positionTop = parseInt(elmt.domElement.offsetTop, 10) - parseInt(styles['margin-top'], 10);
+    element = elmt.parent();
+    while ((element != null)) {
+      position = element.getComputedStyle()['position'];
+      if (element.type === 'body' || (position === 'relative' || position === 'absolute')) {
+        break;
+      } else {
+        positionLeft += parseInt(element.offsetLeft, 10);
+        positionTop += parseInt(element.offsetTop, 10);
+      }
+      element = element.parent();
+    }
+    return {
+      'top': positionTop,
+      'left': positionLeft
+    };
+  };
+
   parse_dimension = function(dim) {
-    return parseInt(dim.substring(0, dim.indexOf("px")), 10);
+    if (dim.indexOf("px") > 0) {
+      return parseInt(dim.substring(0, dim.indexOf("px")), 10);
+    } else {
+      return parseInt(dim, 10);
+    }
   };
 
   root.get_side_border_padding = get_side_border_padding;
+
+  root.calculate_position = calculate_position;
 
   root.parse_dimension = parse_dimension;
 
