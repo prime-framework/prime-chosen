@@ -147,7 +147,7 @@ class Chosen extends AbstractChosen
     Prime.Dom.Document.removeEventListener "click", @click_test_proxy
     
     if not @is_multiple
-      @selected_item.setAttribute 'tabIndex', @search_field.attribute('tabIndex')
+      @selected_item.setAttribute 'tabIndex', @search_field.getAttribute('tabIndex')
       @search_field.setAttribute 'tabIndex', -1
     
     @active_field = false
@@ -162,7 +162,7 @@ class Chosen extends AbstractChosen
 
   activate_field: ->
     if not @is_multiple and not @active_field
-      @search_field.setAttribute 'tabIndex', @selected_item.attribute('tabIndex')
+      @search_field.setAttribute 'tabIndex', @selected_item.getAttribute('tabIndex')
       @selected_item.setAttribute 'tabIndex', -1
 
     @container.addClass "chzn-container-active"
